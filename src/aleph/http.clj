@@ -15,7 +15,11 @@
      URI
      InetSocketAddress]
     [java.util.concurrent
-     TimeoutException]))
+     TimeoutException]
+    [aleph.http.core
+     PoolTimeoutException
+     ConnectionTimeoutException
+     RequestTimeoutException]))
 
 (defn start-server
   "Starts an HTTP server using the provided Ring `handler`.  Returns a server object which can be stopped
@@ -181,7 +185,10 @@
   ([req {:keys [raw-stream? headers max-frame-payload max-frame-size allow-extensions?] :as options}]
     (server/initialize-websocket-handler req options)))
 
-(let [maybe-timeout! (fn [d timeout] (when d (d/timeout! d timeout)))]
+(let [maybe-timeout! (fn [d timeout] (when d (d/timeout! d timeout)))
+      maybe-timeout-with! (fn [d timeout error-class]
+                            (d/catch' (maybe-timeout! d timeout) error-class
+                              (fn [e] (throw (error-class (.getMessage e) e)))))]
   (defn request
     "Takes an HTTP request, as defined by the Ring protocol, with the extensions defined
      by [clj-http](https://github.com/dakrone/clj-http), and returns a deferred representing
@@ -215,14 +222,14 @@
 
              ;; acquire a connection
              (-> (flow/acquire pool k)
-               (maybe-timeout! pool-timeout)
+               (maybe-timeout-with! pool-timeout PoolTimeoutException.)
+
                (d/chain'
                  (fn [conn]
 
                    ;; get the wrapper for the connection, which may or may not be realized yet
                    (-> (first conn)
-
-                     (maybe-timeout! connection-timeout)
+                     (maybe-timeout-with! connection-timeout ConnectionTimeoutException.)
 
                      ;; connection failed, bail out
                      (d/catch'
@@ -238,7 +245,7 @@
                          (when-not (nil? conn')
                            (let [end (System/currentTimeMillis)]
                              (-> (conn' req)
-                               (maybe-timeout! request-timeout)
+                               (maybe-timeout-with! request-timeout RequestTimeoutException.)
 
                                ;; request failed, dispose of the connection
                                (d/catch'

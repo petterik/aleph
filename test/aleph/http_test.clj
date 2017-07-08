@@ -7,6 +7,7 @@
      [http :as http]
      [netty :as netty]
      [flow :as flow]]
+    #_[aleph.http.core :refer [ConnectionTimeoutException]]
     [byte-streams :as bs]
     [manifold.deferred :as d]
     [manifold.stream :as s])
@@ -280,8 +281,13 @@
 (deftest test-connection-timeout
   (with-handler basic-handler
     (is (thrown? TimeoutException
-          @(http-get "http://192.0.2.0" ;; "TEST-NET" in RFC 5737
-             {:connection-timeout 2})))))
+                 @(http-get "http://192.0.2.0" ;; "TEST-NET" in RFC 5737
+                            {:connection-timeout 2}))))
+  
+  #_(with-handler basic-handler
+    (is (thrown? ConnectionTimeoutException
+                 @(http-get "http://192.0.2.0" ;; "TEST-NET" in RFC 5737
+                            {:connection-timeout 2})))))
 
 (deftest test-request-timeout
   (with-handler basic-handler

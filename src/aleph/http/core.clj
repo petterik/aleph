@@ -39,7 +39,8 @@
     [java.util
      Map$Entry]
     [java.util.concurrent
-     ConcurrentHashMap]
+     ConcurrentHashMap
+     TimeoutException]
     [java.util.concurrent.atomic
      AtomicBoolean]))
 
@@ -402,3 +403,25 @@
         (handle-cleanup ch f))
 
       f)))
+
+(gen-class
+ :name "aleph.http.core.PoolTimeoutException"
+ :extend TimeoutException
+ :prefix "pool-timeout-")
+
+(import 'aleph.http.core.PoolTimeoutException)
+
+(gen-class
+ :name "aleph.http.core.ConnectionTimeoutException"
+ :extend TimeoutException
+ :prefix "connection-timeout-")
+
+(import 'aleph.http.core.ConnectionTimeoutException)
+
+(gen-class
+ :name "aleph.http.core.RequestTimeoutException"
+ :extend TimeoutException
+ :prefix "request-timeout-")
+
+(import 'aleph.http.core.RequestTimeoutException)
+
