@@ -283,6 +283,21 @@
           @(http-get "http://192.0.2.0" ;; "TEST-NET" in RFC 5737
              {:connection-timeout 2})))))
 
+(deftest test-connection-timeout-with-value
+  (with-handler basic-handler
+    (is (thrown? Exception
+          @(http-get "http://192.0.2.0" ;; "TEST-NET" in RFC 5737
+             {:connection-timeout 2
+              :connection-timeout-value ::connection-timeout}))))
+
+  (with-handler basic-handler
+    (is (= ::connection-timeout
+           @(d/catch'
+                (http-get "http://192.0.2.0" ;; "TEST-NET" in RFC 5737
+                          {:connection-timeout 2
+                           :connection-timeout-value ::connection-timeout})
+                (fn [e] (:aleph/timeout (ex-data e))))))))
+
 (deftest test-request-timeout
   (with-handler basic-handler
     (is (thrown? TimeoutException

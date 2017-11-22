@@ -198,6 +198,7 @@
              pool-timeout
              response-executor
              connection-timeout
+             connection-timeout-value
              request-timeout
              follow-redirects?]
       :or {pool default-connection-pool
@@ -221,9 +222,18 @@
 
                    ;; get the wrapper for the connection, which may or may not be realized yet
                    (-> (first conn)
-
                      (maybe-timeout! connection-timeout)
 
+                     ;; we might want to wrap a timeout exception into a meaninful value given
+                     (d/catch' TimeoutException
+                       (fn [^Throwable e]
+                         (flow/dispose pool k conn)
+                         (if (nil? connection-timeout-value)
+                           (d/error-deferred e)
+                           (d/error-deferred (ex-info (.getMessage e)
+                                                      {:aleph/timeout connection-timeout-value}
+                                                      e)))))
+                     
                      ;; connection failed, bail out
                      (d/catch'
                        (fn [e]
