@@ -12,9 +12,9 @@
 
 (def other-dependencies
   '[[org.clojure/tools.logging "0.4.0" :exclusions [org.clojure/clojure]]
-    [manifold "0.1.6"]
-    [byte-streams "0.2.4-alpha3"]
-    [potemkin "0.4.5"]])
+    [manifold "0.1.6"  :exclusions [org.clojure/clojure]]
+    [byte-streams "0.2.4-alpha3"  :exclusions [org.clojure/clojure]]
+    [potemkin "0.4.5" :exclusions [org.clojure/clojure]]])
 
 (defproject aleph "0.4.5-alpha6"
   :description "a framework for asynchronous communication"

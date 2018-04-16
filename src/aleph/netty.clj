@@ -52,6 +52,7 @@
      GenericFutureListener Future DefaultThreadFactory]
     [java.io InputStream File]
     [java.nio ByteBuffer]
+    [java.nio.channels ClosedChannelException]
     [io.netty.util.internal SystemPropertyUtil]
     [java.util.concurrent
      ConcurrentHashMap CancellationException ScheduledFuture TimeUnit]
@@ -190,25 +191,34 @@
   (when f
     (if (.isSuccess f)
       (d/success-deferred (.getNow f) nil)
-      (let [d (d/deferred nil)]
+      (let [d' (d/deferred nil)]
         (.addListener f
           (reify GenericFutureListener
-            (operationComplete [_ _]
-              (cond
-                (.isSuccess f)
-                (d/success! d (.getNow f))
+            (operationComplete [_ p]
+              (log/error "operation complete on:" p
+                         "success:" (.isSuccess p)
+                         "report to:" d' (.getName (class d')) (d/realized? d')
+                         "with value:" (.getNow p)
+                         "class loader:" (.getContextClassLoader (Thread/currentThread))
+                         "system loader:" (ClassLoader/getSystemClassLoader)
+                         "complier loader:" (.getClassLoader Compiler))
+              (log/error (.loadClass ^java.net.URLClassLoader (.getClassLoader Compiler) "clojure.lang.PersistentArrayMap"))
+              (d/success! d' "boom")
+              #_(cond
+                (.isSuccess p)
+                (d/success! d' (.getNow p))
 
-                (.isCancelled f)
-                (d/error! d (CancellationException. "future is cancelled."))
+                (.isCancelled p)
+                (d/error! d' (CancellationException. "future is cancelled."))
 
-                (some? (.cause f))
-                (if (instance? java.nio.channels.ClosedChannelException (.cause f))
-                  (d/success! d false)
-                  (d/error! d (.cause f)))
+                (some? (.cause p))
+                (if (instance? ClosedChannelException (.cause p))
+                  (d/success! d' false)
+                  (d/error! d' (.cause p)))
 
                 :else
-                (d/error! d (IllegalStateException. "future in unknown state"))))))
-        d))))
+                (d/error! d' (IllegalStateException. "future in unknown state"))))))
+        d'))))
 
 (defn allocate [x]
   (if (instance? Channel x)
@@ -924,11 +934,13 @@
           (close [_]
             (when (compare-and-set! closed? false true)
               (-> ch .close .sync)
-              (-> group .shutdownGracefully)
-              (when on-close
-                (d/chain'
-                 (wrap-future (.terminationFuture group))
-                 (fn [_] (on-close))))))
+              (-> group .shutdownGracefully #_.await)
+              (let [^Future tf (-> group .terminationFuture)]
+                (when on-close
+                  (d/chain'
+                   (wrap-future tf)
+                   (fn [_] (log/error "running on close") (on-close)))))
+              nil))
           AlephServer
           (port [_]
             (-> ch .localAddress .getPort))
