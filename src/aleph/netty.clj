@@ -195,16 +195,7 @@
         (.addListener f
           (reify GenericFutureListener
             (operationComplete [_ p]
-              (log/error "operation complete on:" p
-                         "success:" (.isSuccess p)
-                         "report to:" d' (.getName (class d')) (d/realized? d')
-                         "with value:" (.getNow p)
-                         "class loader:" (.getContextClassLoader (Thread/currentThread))
-                         "system loader:" (ClassLoader/getSystemClassLoader)
-                         "complier loader:" (.getClassLoader Compiler))
-              (log/error (.loadClass ^java.net.URLClassLoader (.getClassLoader Compiler) "clojure.lang.PersistentArrayMap"))
-              (d/success! d' "boom")
-              #_(cond
+              (cond
                 (.isSuccess p)
                 (d/success! d' (.getNow p))
 
@@ -219,6 +210,13 @@
                 :else
                 (d/error! d' (IllegalStateException. "future in unknown state"))))))
         d'))))
+
+(defn add-listener!
+  [^Future f listener]
+  (.addListener f
+    (reify GenericFutureListener
+      (operationComplete [_ p]
+        (listener p)))))
 
 (defn allocate [x]
   (if (instance? Channel x)
@@ -934,12 +932,10 @@
           (close [_]
             (when (compare-and-set! closed? false true)
               (-> ch .close .sync)
-              (-> group .shutdownGracefully #_.await)
-              (let [^Future tf (-> group .terminationFuture)]
-                (when on-close
-                  (d/chain'
-                   (wrap-future tf)
-                   (fn [_] (log/error "running on close") (on-close)))))
+              (-> group .shutdownGracefully)
+              (add-listener!
+               (-> group .terminationFuture)
+               (fn [_] (on-close)))
               nil))
           AlephServer
           (port [_]
