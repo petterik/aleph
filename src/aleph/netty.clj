@@ -933,9 +933,10 @@
             (when (compare-and-set! closed? false true)
               (-> ch .close .sync)
               (-> group .shutdownGracefully)
-              (add-listener!
-               (-> group .terminationFuture)
-               (fn [_] (on-close)))
+              (when on-close
+                (add-listener!
+                 (-> group .terminationFuture)
+                 (fn [_] (on-close))))
               nil))
           AlephServer
           (port [_]
